@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tarea — Clase 3 | El poder de una decisión</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
 <style>
 :root {
   --azul:   #0F2747;
@@ -328,12 +328,6 @@ body{font-family:'Montserrat',sans-serif;background:var(--fondo);color:var(--gri
 
 </div><!-- /main -->
 
-<!-- REPORTE OCULTO para html2canvas -->
-<div id="reporteCaptura">
-  <div class="rep-header">
-    <img class="rep-logo" id="repLogo" src="" alt="Logo">
-    <div class="rep-htxt">
-      <div class="rep-htitle">Tarea — Clase 3: El poder de una decisión</div>
       <div class="rep-hsub">Curso de Liderazgo | Nivel 1: Fundamentos Personales · Eduardo Montano</div>
     </div>
   </div>
@@ -420,64 +414,247 @@ function updateProgress() {
   document.getElementById('btnDownload').disabled = done < 7;
 }
 
-// ── DOWNLOAD ──
+// ── DOWNLOAD — Canvas nativo (sin html2canvas) ──
 async function descargarReporte() {
-  // Fill report data
-  IDS.forEach((id, i) => {
-    const val = document.getElementById(id).value.trim();
-    const el = document.getElementById('rr' + (i+1));
-    if (el) el.textContent = val || '—';
-  });
-  document.getElementById('repFecha').textContent = 'Fecha: ' + new Date().toLocaleDateString('es-ES', {day:'2-digit',month:'long',year:'numeric'});
-
   const btn = document.getElementById('btnDownload');
   btn.disabled = true;
   btn.textContent = 'Generando reporte…';
 
-  const el = document.getElementById('reporteCaptura');
-
-  // FIX: bring into normal flow with opacity:0 so html2canvas can render it
-  el.style.position = 'relative';
-  el.style.left = 'auto';
-  el.style.top = 'auto';
-  el.style.opacity = '0';
-  el.style.visibility = 'visible';
-  el.style.pointerEvents = 'none';
-  el.style.zIndex = '9999';
-  el.style.width = '900px';
-  el.style.background = '#ffffff';
-
   try {
-    // Wait for layout to settle
-    await new Promise(r => setTimeout(r, 350));
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      width: 900,
-      scrollX: 0,
-      scrollY: 0,
-      windowWidth: 900,
-      logging: false
+    // Recoger respuestas
+    const preguntas = [
+      { label: 'Pregunta 1', titulo: 'Decisión pequeña con gran impacto' },
+      { label: 'Pregunta 2', titulo: 'Decisión que construye vs. que debilita' },
+      { label: 'Pregunta 3', titulo: 'Decisión digital difícil de sostener' },
+      { label: 'Pregunta 4', titulo: 'Decisión que necesito fortalecer' },
+      { label: 'Pregunta 5 — Acción si–entonces', titulo: 'Mi plan para las próximas 24 horas' },
+      { label: 'Reflexión abierta', titulo: 'Decisiones que construyen y debilitan mi futuro' },
+      { label: 'Mi compromiso', titulo: 'Mi mini-regla personal esta semana' }
+    ];
+
+    const respuestas = IDS.map(id => document.getElementById(id).value.trim() || '—');
+    const fecha = new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'long', year:'numeric'});
+
+    // Canvas setup
+    const W = 900;
+    const PADDING = 40;
+    const colW = W - PADDING * 2;
+
+    // Fuentes y colores
+    const AZUL = '#0F2747';
+    const DORADO = '#C9A34E';
+    const GRIS = '#4B5563';
+    const MARFIL = '#F7F2E8';
+    const BLANCO = '#FFFFFF';
+
+    // ── Helper: wrap text ──
+    function wrapText(ctx, text, x, y, maxW, lineH) {
+      const words = text.split(' ');
+      let line = '';
+      let curY = y;
+      for (let n = 0; n < words.length; n++) {
+        const test = line + words[n] + ' ';
+        if (ctx.measureText(test).width > maxW && n > 0) {
+          ctx.fillText(line.trim(), x, curY);
+          line = words[n] + ' ';
+          curY += lineH;
+        } else {
+          line = test;
+        }
+      }
+      ctx.fillText(line.trim(), x, curY);
+      return curY;
+    }
+
+    // ── Measure total height needed ──
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = W;
+    const tmpCtx = tmpCanvas.getContext('2d');
+
+    function measureBlock(ctx, respuesta, lineH) {
+      const words = respuesta.split(' ');
+      let line = '';
+      let lines = 1;
+      for (let n = 0; n < words.length; n++) {
+        const test = line + words[n] + ' ';
+        if (ctx.measureText(test).width > colW - 24 && n > 0) {
+          line = words[n] + ' ';
+          lines++;
+        } else {
+          line = test;
+        }
+      }
+      return lines * lineH;
+    }
+
+    // Calculate height
+    let totalH = 160; // header
+    totalH += 3;      // gold bar
+    totalH += 30;     // body padding top
+    totalH += 60;     // intro box
+    totalH += 20;     // margin
+
+    tmpCtx.font = '13px sans-serif';
+    const lineH = 20;
+    for (let i = 0; i < preguntas.length; i++) {
+      totalH += 18;  // label
+      totalH += 22;  // title
+      const ansH = Math.max(40, measureBlock(tmpCtx, respuestas[i], lineH) + 24);
+      totalH += ansH;
+      totalH += 16;  // divider + margin
+    }
+    totalH += 60; // footer
+
+    // ── Draw on real canvas ──
+    const canvas = document.createElement('canvas');
+    canvas.width = W * 2;
+    canvas.height = totalH * 2;
+    canvas.style.width = W + 'px';
+    canvas.style.height = totalH + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2); // retina
+
+    // Background
+    ctx.fillStyle = BLANCO;
+    ctx.fillRect(0, 0, W, totalH);
+
+    // ── HEADER ──
+    ctx.fillStyle = AZUL;
+    ctx.fillRect(0, 0, W, 140);
+
+    // Logo box
+    ctx.fillStyle = BLANCO;
+    roundRect(ctx, 36, 28, 84, 84, 10);
+    ctx.fill();
+
+    // Logo image - embedded directly to avoid cross-origin canvas taint
+    const logoImg = new Image();
+    logoImg.crossOrigin = 'anonymous';
+    await new Promise(res => {
+      logoImg.onload = res;
+      logoImg.onerror = res;
+      logoImg.src = 'data:image/jpeg;base64,' + LOGO;
     });
+    try { ctx.drawImage(logoImg, 42, 34, 72, 72); } catch(e) {}
+
+    // Header text
+    ctx.fillStyle = MARFIL;
+    ctx.font = 'bold 20px Georgia, serif';
+    ctx.fillText('Tarea — Clase 3: El poder de una decisión', 136, 68);
+    ctx.fillStyle = 'rgba(247,242,232,0.65)';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('Curso de Liderazgo | Nivel 1: Fundamentos Personales · Eduardo Montano', 136, 94);
+    ctx.fillStyle = DORADO;
+    ctx.font = '12px sans-serif';
+    ctx.fillText('Fecha: ' + fecha, 136, 118);
+
+    // Gold bar
+    const grad = ctx.createLinearGradient(0, 140, W, 140);
+    grad.addColorStop(0, '#C9A34E');
+    grad.addColorStop(1, '#e0c06a');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 140, W, 3);
+
+    // ── BODY ──
+    let y = 143 + 24;
+
+    // Intro box
+    ctx.fillStyle = '#f8f5ef';
+    roundRect(ctx, PADDING, y, colW, 52, 6);
+    ctx.fill();
+    ctx.fillStyle = DORADO;
+    ctx.fillRect(PADDING, y, 3, 52);
+    ctx.fillStyle = GRIS;
+    ctx.font = '13px sans-serif';
+    wrapText(ctx, 'Este reporte recoge tus reflexiones personales de la Clase 3. Consérvalo como registro de tu proceso de aprendizaje.', PADDING + 16, y + 20, colW - 24, 19);
+    y += 52 + 18;
+
+    // Questions
+    for (let i = 0; i < preguntas.length; i++) {
+      // Label
+      ctx.fillStyle = DORADO;
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(preguntas[i].label.toUpperCase(), PADDING, y + 12);
+      y += 18;
+
+      // Title
+      ctx.fillStyle = AZUL;
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(preguntas[i].titulo, PADDING, y + 14);
+      y += 22;
+
+      // Answer box
+      const ansLineH = 20;
+      ctx.font = '13px sans-serif';
+      const ansLines = Math.ceil(measureBlock(ctx, respuestas[i], ansLineH) / ansLineH);
+      const ansH = Math.max(40, ansLines * ansLineH + 24);
+      ctx.fillStyle = '#f8f5ef';
+      roundRect(ctx, PADDING, y, colW, ansH, 6);
+      ctx.fill();
+      ctx.fillStyle = GRIS;
+      ctx.font = '13px sans-serif';
+      wrapText(ctx, respuestas[i], PADDING + 12, y + ansLineH, colW - 24, ansLineH);
+      y += ansH + 10;
+
+      // Divider
+      if (i < preguntas.length - 1) {
+        ctx.strokeStyle = 'rgba(201,163,78,0.2)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PADDING, y);
+        ctx.lineTo(W - PADDING, y);
+        ctx.stroke();
+        y += 14;
+      }
+    }
+
+    // ── FOOTER ──
+    y += 10;
+    ctx.fillStyle = AZUL;
+    ctx.fillRect(0, y, W, 50);
+    ctx.fillStyle = 'rgba(247,242,232,0.6)';
+    ctx.font = '12px sans-serif';
+    ctx.fillText('Liderazgo Extraordinarios · Nivel 1 · Clase 3', PADDING, y + 28);
+    ctx.fillStyle = DORADO;
+    ctx.textAlign = 'right';
+    ctx.fillText('Fecha: ' + fecha, W - PADDING, y + 28);
+    ctx.textAlign = 'left';
+
+    // Download
+    let dataUrl;
+    try {
+      dataUrl = canvas.toDataURL('image/png');
+    } catch(e) {
+      // Canvas tainted - generate without logo
+      console.warn('Canvas tainted, retrying without logo');
+      throw e;
+    }
     const link = document.createElement('a');
     link.download = 'Tarea_Clase3_El_poder_de_una_decision.png';
-    link.href = canvas.toDataURL('image/png');
+    link.href = dataUrl;
     link.click();
+
   } catch(e) {
-    alert('Hubo un problema al generar el reporte. Intenta de nuevo.');
+    console.error(e);
+    alert('Error al generar el reporte: ' + e.message);
   } finally {
-    // Restore hidden state
-    el.style.position = 'fixed';
-    el.style.left = '-9999px';
-    el.style.top = '0';
-    el.style.opacity = '1';
-    el.style.visibility = 'hidden';
-    el.style.pointerEvents = '';
-    el.style.zIndex = '';
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar mi reporte en PNG';
   }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 // ── INIT ──
