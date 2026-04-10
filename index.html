@@ -100,9 +100,9 @@ body{font-family:'Montserrat',sans-serif;background:var(--fondo);color:var(--gri
   width:900px;
   background:#fff;
   font-family:'Montserrat',sans-serif;
-  opacity:0;
+  visibility:hidden;
   pointer-events:none;
-  z-index:-1;
+  z-index:-9999;
 }
 .rep-header{background:#0F2747;padding:28px 36px;display:flex;align-items:center;gap:20px;}
 .rep-logo{height:60px;background:#fff;border-radius:8px;padding:6px 10px;}
@@ -369,57 +369,74 @@ function descargarReporte() {
   btn.disabled = true;
   btn.textContent = 'Generando reporte…';
 
-  // Poblar el reporte oculto con las respuestas
+  // 1. Poblar respuestas
   var fecha = new Date().toLocaleDateString('es-ES', {day:'2-digit', month:'long', year:'numeric'});
   document.getElementById('repFecha').textContent = 'Fecha: ' + fecha;
-
   IDS.forEach(function(id, i) {
-    var num = i + 1;
-    var el = document.getElementById('rr' + num);
+    var el = document.getElementById('rr' + (i + 1));
     if (el) el.textContent = document.getElementById(id).value.trim() || '—';
   });
 
-  // El truco: mover el reporte a posición visible (pero invisible) para que html2canvas lo capture
+  // 2. Traer el reporte al viewport con visibilidad real (html2canvas necesita verlo)
   var rep = document.getElementById('reporteCaptura');
-  rep.style.position = 'fixed';
-  rep.style.top = '0';
-  rep.style.left = '0';
-  rep.style.opacity = '0';
-  rep.style.zIndex = '9999';
+  var prev = {
+    position:   rep.style.position,
+    top:        rep.style.top,
+    left:       rep.style.left,
+    visibility: rep.style.visibility,
+    zIndex:     rep.style.zIndex,
+    pointerEvents: rep.style.pointerEvents
+  };
+  rep.style.position      = 'fixed';
+  rep.style.top           = '0';
+  rep.style.left          = '0';
+  rep.style.visibility    = 'visible';    // VISIBLE para html2canvas
+  rep.style.zIndex        = '-9999';      // detrás de todo (usuario no lo ve)
   rep.style.pointerEvents = 'none';
 
-  // Pequeña pausa para que el DOM se actualice
-  setTimeout(function() {
-    html2canvas(rep, {
-      scale: 2,
-      useCORS: true,
-      allowTaint: false,
-      backgroundColor: '#ffffff',
-      width: 900,
-      windowWidth: 900
-    }).then(function(canvas) {
-      // Restaurar el estado oculto
-      rep.style.opacity = '0';
-      rep.style.zIndex = '-1';
+  // 3. Esperar un frame para que el browser pinte
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      html2canvas(rep, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: '#ffffff',
+        width: 900,
+        windowWidth: 900,
+        logging: false
+      }).then(function(canvas) {
+        // 4. Restaurar estado oculto
+        rep.style.position      = prev.position;
+        rep.style.top           = prev.top;
+        rep.style.left          = prev.left;
+        rep.style.visibility    = prev.visibility;
+        rep.style.zIndex        = prev.zIndex;
+        rep.style.pointerEvents = prev.pointerEvents;
 
-      // Descargar
-      var link = document.createElement('a');
-      link.download = 'Tarea_Clase3_El_poder_de_una_decision.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+        // 5. Descargar
+        var link = document.createElement('a');
+        link.download = 'Tarea_Clase3_El_poder_de_una_decision.png';
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
-      // Restaurar botón
-      btn.disabled = false;
-      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar mi reporte en PNG';
-    }).catch(function(err) {
-      console.error('Error html2canvas:', err);
-      rep.style.opacity = '0';
-      rep.style.zIndex = '-1';
-      btn.disabled = false;
-      btn.innerHTML = 'Error — intenta de nuevo';
-      alert('Ocurrió un error al generar el reporte. Por favor intenta nuevamente.');
+        btn.disabled = false;
+        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar mi reporte en PNG';
+      }).catch(function(err) {
+        rep.style.position      = prev.position;
+        rep.style.top           = prev.top;
+        rep.style.left          = prev.left;
+        rep.style.visibility    = prev.visibility;
+        rep.style.zIndex        = prev.zIndex;
+        rep.style.pointerEvents = prev.pointerEvents;
+        btn.disabled = false;
+        btn.textContent = 'Error — intenta de nuevo';
+        console.error('html2canvas error:', err);
+      });
     });
-  }, 100);
+  });
 }
 
 // ── INICIO ──
