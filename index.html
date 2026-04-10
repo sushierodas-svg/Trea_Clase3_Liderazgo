@@ -164,6 +164,7 @@ body{font-family:'Montserrat',sans-serif;background:var(--fondo);color:var(--gri
 #reporteCaptura{
   position:fixed;left:-9999px;top:0;
   width:900px;background:#fff;font-family:'Montserrat',sans-serif;
+  visibility:hidden;
 }
 .rep-header{background:var(--azul);padding:28px 36px;display:flex;align-items:center;gap:20px;}
 .rep-logo{height:60px;background:#fff;border-radius:8px;padding:6px 10px;}
@@ -433,14 +434,32 @@ async function descargarReporte() {
   btn.disabled = true;
   btn.textContent = 'Generando reporte…';
 
-  // Move element into flow temporarily
   const el = document.getElementById('reporteCaptura');
-  const orig = el.style.cssText;
-  el.style.cssText = 'position:fixed;top:0;left:0;width:900px;opacity:0;z-index:9999;background:#fff;';
+
+  // FIX: bring into normal flow with opacity:0 so html2canvas can render it
+  el.style.position = 'relative';
+  el.style.left = 'auto';
+  el.style.top = 'auto';
+  el.style.opacity = '0';
+  el.style.visibility = 'visible';
+  el.style.pointerEvents = 'none';
+  el.style.zIndex = '9999';
+  el.style.width = '900px';
+  el.style.background = '#ffffff';
 
   try {
-    await new Promise(r => setTimeout(r, 200));
-    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: 900 });
+    // Wait for layout to settle
+    await new Promise(r => setTimeout(r, 350));
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      width: 900,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: 900,
+      logging: false
+    });
     const link = document.createElement('a');
     link.download = 'Tarea_Clase3_El_poder_de_una_decision.png';
     link.href = canvas.toDataURL('image/png');
@@ -448,7 +467,14 @@ async function descargarReporte() {
   } catch(e) {
     alert('Hubo un problema al generar el reporte. Intenta de nuevo.');
   } finally {
-    el.style.cssText = orig;
+    // Restore hidden state
+    el.style.position = 'fixed';
+    el.style.left = '-9999px';
+    el.style.top = '0';
+    el.style.opacity = '1';
+    el.style.visibility = 'hidden';
+    el.style.pointerEvents = '';
+    el.style.zIndex = '';
     btn.disabled = false;
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Descargar mi reporte en PNG';
   }
